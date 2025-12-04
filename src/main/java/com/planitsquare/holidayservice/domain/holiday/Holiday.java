@@ -21,7 +21,7 @@ public class Holiday {
     @JoinColumn(name = "country_id", nullable = false)
     private Country country;
 
-    @Column(nullable = false)
+    @Column(name = "holiday_year",nullable = false)
     private Integer year;
 
     @Column(nullable = false)

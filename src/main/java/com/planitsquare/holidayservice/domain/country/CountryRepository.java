@@ -11,5 +11,5 @@ public interface CountryRepository extends JpaRepository<Country, Long> {
 
     boolean existsByCode(String code);
 
-    List<Country> findAllUsedTrue();
+    List<Country> findAllByUsedTrue();
 }
