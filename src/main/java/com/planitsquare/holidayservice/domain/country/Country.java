@@ -28,6 +28,11 @@ public class Country {
         this.name = name;
     }
 
+    public void updateCountry(String code,String name){
+        this.code = code;
+        this.name = name;
+    }
+
     public void markSupported(boolean used) {
         this.used= used;
     }
