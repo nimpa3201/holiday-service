@@ -17,6 +17,12 @@ public interface HolidayRepository extends JpaRepository<Holiday, Long> ,Holiday
     );
 
     // 연도/국가 단위 전체 삭제 (Refresh/삭제 기능용)
-    void deleteByCountryAndYear(Country country, Integer year);
+    long deleteByCountryAndYear(Country country, Integer year);
+
+    // 특정 연도 삭제
+    long deleteByYear(Integer year);
+
+    // 특정 국가 삭제
+    long deleteByCountry(Country country);
 
 }

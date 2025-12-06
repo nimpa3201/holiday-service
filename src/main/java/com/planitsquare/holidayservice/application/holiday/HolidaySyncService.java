@@ -95,5 +95,29 @@ public class HolidaySyncService {
 
     }
 
+    @Transactional
+    public long delete(Integer year, String code) {
+        if (year == null && code == null) {
+            throw new IllegalStateException("삭제 조건 필요합니다");
+        }
+
+        Country country = null;
+
+        if (code != null) {
+            country = countryRepository.findByCode(code)
+                .orElseThrow(() -> new IllegalStateException("국가를 찾을 수 없습니다."));
+        }
+
+        if (year != null && country != null) {
+            return holidayRepository.deleteByCountryAndYear(country, year);
+        }
+
+        if (year != null) {
+            return holidayRepository.deleteByYear(year);
+        }
+
+        return holidayRepository.deleteByCountry(country);
+
+    }
 
 }

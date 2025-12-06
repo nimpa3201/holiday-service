@@ -43,6 +43,17 @@ public class HolidayController {
         return ResponseEntity.ok(ApiResponse.ok("sync completed"));
     }
 
+
+    @DeleteMapping
+    public ResponseEntity<ApiResponse<String>> delete(
+        @RequestParam(required = false) Integer year,
+        @RequestParam(required = false) String countryCode
+    ) {
+        long deleted = holidaySyncService.delete(year, countryCode);
+        String message = "deleted " + deleted + " holidays";
+        return ResponseEntity.ok(ApiResponse.ok(message));
+    }
+
     // 검색
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<HolidayResponse>>> search(
