@@ -1,95 +1,106 @@
 # 🌍 Holiday Keeper  
-Nager.Date Public API 기반 공휴일 동기화/조회 서비스
+**Nager.Date Public API 기반 공휴일 동기화·조회 서비스**
 
-Holiday Keeper는 Nager.Date API(v3)를 사용하여  
-국가별 공휴일 데이터를 **동기화(Sync) · 조회(Search) · 삭제(Delete) · 재동기화(Refresh)** 하는 Spring Boot 백엔드 서비스입니다.
+Holiday Keeper는 Nager.Date API(v3)를 기반으로  
+**공휴일 데이터 동기화(Sync) · 조회(Search) · 삭제(Delete) · 재동기화(Refresh)**  
+기능을 제공하는 Spring Boot 백엔드 서비스입니다.
 
 PlanitSquare 기술 과제 요구사항을 충족하면서,  
-**글로벌 예외 처리, QueryDSL 기반 검색, RestClient 기반 외부 API 연동, 스케줄러 자동화(선택)** 등을 포함해  
-실제 운영 수준의 구조를 목표로 설계했습니다.
+글로벌 예외 처리, QueryDSL 기반 검색, 외부 API 연동(RestClient), 스케줄러 자동화(선택) 등을 포함하여  
+운영 환경에서도 확장 가능한 구조로 설계되었습니다.
 
 ---
 
 ## 📋 1. 프로젝트 개요
 
-### 🎯 구현 목표
-- 외부 API(Nager.Date)로부터 국가/공휴일 데이터를 안전하게 동기화
-- 연도/국가/기간/유형 기반의 공휴일 검색(QueryDSL)
-- 재동기화(Refresh)를 통한 Upsert 전략 제공
-- 예외 처리, 공통 응답 구조, 스케줄러 등 운영 기능 포함
+### 🎯 목표
+- Nager.Date API에서 국가/공휴일 데이터를 안정적으로 동기화
+- 연도·국가·기간·유형 기반의 동적 검색(QueryDSL) 제공
+- 재동기화(Refresh) 기능을 통한 Upsert 기반 데이터 관리
+- 서비스 운영을 위한 예외 처리 · 공통 응답 · 스케줄러 지원
 
-
-### 🛠 기술 스택
-- Java 21  
-- Spring Boot 3.4.12  
-- Spring Data JPA  
-- QueryDSL 5   
-- H2 Database
-- Spring Scheduler  
 ---
 
-## 🚀 2. 빌드 & 실행 방법
+## 🛠 2. 기술 스택
 
-### 2.1 프로젝트 클론
+| 카테고리 | 기술 |
+|---------|------|
+| Language | Java 21 |
+| Framework | Spring Boot 3.4.12 |
+| ORM | Spring Data JPA |
+| Query | QueryDSL 5 |
+| DB | H2 Database (In-Memory) |
+| HTTP Client | Spring RestClient |
+| Scheduler | Spring Scheduler |
+| API Docs | Swagger UI (springdoc-openapi-starter) |
+
+---
+
+## 🚀 3. 빌드 & 실행 방법
+
+### 3.1 Clone
 git clone <your-repo-url>  
 cd holiday-service  
 
-### 2.2 빌드
+### 3.2 Build
 ./gradlew clean build  
 
-### 2.3 실행
+### 3.3 Run
 ./gradlew bootRun  
 
-### 2.4 주요 URL
+### 3.4 주요 URL
 - Swagger UI: http://localhost:8080/swagger-ui/index.html  
-- OpenAPI Docs: http://localhost:8080/v3/api-docs  
 - H2 Console: http://localhost:8080/h2-console  
-  - JDBC URL: jdbc:h2:file:~/holidaydb  
+  - JDBC URL: jdbc:h2:mem:holidaydb  
+  - Username: sa  
 
 ---
 
-## 🔄 3. 데이터 동기화 기능
+## 🔄 4. 데이터 동기화 기능
 
-### ✔ 3.1 국가 목록 동기화
-- /AvailableCountries API 호출
-- Country 엔티티로 저장
-- used=true 플래그로 활성 국가 관리
-- 재실행 시 중복 없이 유지
+### ✔ 4.1 국가 목록 동기화
+- /AvailableCountries 호출  
+- Country 엔티티 저장  
+- used=true 플래그로 활성 국가 관리  
+- 재실행 시 중복 없이 유지  
 
-### ✔ 3.2 전체 공휴일 초기 적재 (2020~2025)
-엔드포인트:  
-POST /api/holidays/sync/initial  
+---
+
+### ✔ 4.2 전체 공휴일 초기 적재 (2020~2025)
+**POST /api/holidays/sync/initial**
 
 동작:
-- used=true 국가 목록 조회  
-- 2020~2025 전체 연도에 대해 `/PublicHolidays/{year}/{country}` 호출  
-- Holiday 엔티티 저장  
-- 중복 검사(country + date + localName) 후 신규 데이터만 삽입  
-
-### ✔ 3.3 특정 연도·국가 동기화
-POST /api/holidays/sync/{year}/{countryCode}
-
-예:  
-sync KR 공휴일 2024 → `/api/holidays/sync/2024/KR`
+1. used=true 국가 목록 조회  
+2. 2020~2025 × 국가 조합에 대해 /PublicHolidays/{year}/{countryCode} 호출  
+3. Holiday 엔티티 저장  
+4. 중복 검사 후 신규만 삽입  
 
 ---
 
-## 🔁 4. 재동기화(Refresh = Delete + Sync)
-엔드포인트:  
-POST /api/holidays/refresh?year=&countryCode=
+### ✔ 4.3 특정 연도·국가 동기화
+**POST /api/holidays/sync/{year}/{countryCode}**
 
-동작 케이스:
+예시:
+`/api/holidays/sync/2024/KR`
+
+---
+
+## 🔁 5. 재동기화(Refresh = Delete → Sync)
+
+**POST /api/holidays/refresh?year=&countryCode=**
+
+### 동작 케이스
 
 | year | countryCode | 동작 |
 |------|-------------|------|
-| O | O | 특정 연도 + 국가만 재동기화 |
+| O | O | 특정 연도 + 특정 국가 재동기화 |
 | O | X | 모든 국가의 해당 연도 재동기화 |
 | X | O | 해당 국가의 2020~2025 전체 재동기화 |
-| X | X | ❌ BusinessException(INVALID_REQUEST) |
+| X | X | INVALID_REQUEST 오류 |
 
-처리 전략:
-1. 조건에 맞는 Holiday 삭제  
-2. 동일 조건으로 Sync 재실행 → 사실상 Upsert  
+### 처리 방식
+1. 기존 Holiday 데이터 삭제  
+2. 동일 조건으로 Sync 재실행 → Upsert 효과  
 
 ---
 
@@ -160,29 +171,29 @@ GET /api/holidays
 
 ## 🧩 8. 패키지 구조 (실제 구현 기반)
 
-com.planitsquare.holidayservice  
- ├─ global  
- │   ├─ api (ApiResponse, PageResponse)  
- │   ├─ config (Swagger, RestClient, JPA/Querydsl)  
- │   └─ exception (ErrorCode, BusinessException, Handler)  
- │  
- ├─ domain  
- │   ├─ country (Country, CountryRepository)  
- │   └─ holiday (Holiday, Repository, QueryDSL 구현)  
- │  
- ├─ external  
- │   └─ nager (NagerApiClient + DTO)  
- │  
- ├─ application  
- │   ├─ country (CountrySyncService)  
- │   └─ holiday (HolidaySyncService, HolidayQueryService, SearchCond)  
- │  
- ├─ presentation  
- │   ├─ HolidayController  
- │   └─ dto (HolidayResponse)  
- │  
- └─ scheduler  
-     └─ HolidaySyncScheduler (선택)
+com.planitsquare.holidayservice
+ ├─ global
+ │   ├─ api
+ │   ├─ config
+ │   └─ exception
+ │
+ ├─ domain
+ │   ├─ country
+ │   └─ holiday
+ │
+ ├─ external
+ │   └─ nager
+ │
+ ├─ application
+ │   ├─ country
+ │   └─ holiday
+ │
+ ├─ presentation
+ │   ├─ HolidayController
+ │   └─ dto
+ │
+ └─ scheduler
+
 
 ---
 
@@ -223,5 +234,6 @@ Spring Scheduler cron:
 - [x] QueryDSL 기반 동적 검색  
 - [x] 글로벌 예외 처리 적용  
 - [x] 공통 응답 구조(ApiResponse, PageResponse)  
-- [x] RestClient 기반 외부 API 연동  
+- [x] RestClient 기반 외부 API 연동
+- [x] Swagger UI 자동 문서화
 
