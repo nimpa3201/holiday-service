@@ -120,4 +120,43 @@ public class HolidaySyncService {
 
     }
 
+
+    @Transactional
+    public void refresh(Integer year, String countryCode) {
+
+        if (year == null && countryCode == null) {
+            throw new IllegalStateException("year 또는 countryCode 필요");
+        }
+
+        // 국가 조회 (필요한 경우에만)
+        Country country = null;
+        if (countryCode != null) {
+            country = countryRepository.findByCode(countryCode)
+                .orElseThrow(() -> new IllegalStateException("국가를 찾을 수 없습니다."));
+        }
+
+        // 1) 삭제
+        if (year != null && country != null) {
+            holidayRepository.deleteByCountryAndYear(country, year);
+            syncByYearAndCountry(year, countryCode);
+            return;
+        }
+
+        if (year != null) {
+            holidayRepository.deleteByYear(year);
+            // 모든 국가 다시 insert
+            for (Country c : countryRepository.findAllByUsedTrue()) {
+                syncByYearAndCountry(year, c.getCode());
+            }
+            return;
+        }
+
+        // country only
+        holidayRepository.deleteByCountry(country);
+        for (int yearVal = 2020; yearVal <= 2025; yearVal++) {
+            syncByYearAndCountry(yearVal, countryCode);
+        }
+    }
 }
+
+

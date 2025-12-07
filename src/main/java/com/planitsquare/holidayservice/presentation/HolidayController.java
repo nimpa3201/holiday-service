@@ -43,7 +43,17 @@ public class HolidayController {
         return ResponseEntity.ok(ApiResponse.ok("sync completed"));
     }
 
+    // 재동기화 (연도 or 국가)
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<String>> refresh(
+        @RequestParam(required = false) Integer year,
+        @RequestParam(required = false) String countryCode
+    ) {
+        holidaySyncService.refresh(year, countryCode);
+        return ResponseEntity.ok(ApiResponse.ok("refresh completed"));
+    }
 
+    // 삭제
     @DeleteMapping
     public ResponseEntity<ApiResponse<String>> delete(
         @RequestParam(required = false) Integer year,
