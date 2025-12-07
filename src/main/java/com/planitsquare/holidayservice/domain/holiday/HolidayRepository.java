@@ -5,6 +5,7 @@ import com.planitsquare.holidayservice.domain.country.Country;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;
+import java.util.List;
 
 
 public interface HolidayRepository extends JpaRepository<Holiday, Long> ,HolidayRepositoryCustom {
@@ -15,6 +16,8 @@ public interface HolidayRepository extends JpaRepository<Holiday, Long> ,Holiday
         LocalDate date,
         String localName
     );
+
+    List<Holiday> findByCountryAndYear(Country country, int year);
 
     // 연도/국가 단위 전체 삭제 (Refresh/삭제 기능용)
     long deleteByCountryAndYear(Country country, Integer year);

@@ -16,6 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,67 +33,53 @@ public class HolidaySyncService {
 
     @Transactional
     public void syncByYearAndCountry(int year, String countryCode) {
-
         long start = System.currentTimeMillis();
-        try {
-            Country country = countryRepository.findByCode(countryCode)
-                .orElseThrow(() -> new BusinessException(
-                    ErrorCode.COUNTRY_NOT_FOUND,
-                    "존재하지 않는 국가 코드입니다. countryCode=" + countryCode
-                ));
 
-            List<NagerHolidayResponse> publicHolidays;
-            try {
-                publicHolidays = nagerApiClient.getPublicHolidays(year, countryCode);
-            } catch (Exception e) {
-                log.error("Nager.Date API 호출 중 오류 - year={}, countryCode={}", year, countryCode, e);
-                throw new BusinessException(
-                    ErrorCode.NAGER_API_ERROR,
-                    String.format("Nager.Date API 호출 실패 - year=%d, countryCode=%s, cause=%s",
-                        year, countryCode, e.getMessage())
+        Country country = countryRepository.findByCode(countryCode)
+            .orElseThrow(() -> new BusinessException(
+                ErrorCode.COUNTRY_NOT_FOUND,
+                "존재하지 않는 국가 코드입니다. countryCode=" + countryCode
+            ));
+
+        List<NagerHolidayResponse> publicHolidays = nagerApiClient.getPublicHolidays(year, countryCode);
+
+        List<Holiday> existing = holidayRepository.findByCountryAndYear(country, year);
+        Map<String, Holiday> existingMap = existing.stream()
+            .collect(Collectors.toMap(
+                h -> h.getDate() + "|" + h.getLocalName(),
+                Function.identity()
+            ));
+
+        List<Holiday> toInsert = new ArrayList<>();
+
+        for (NagerHolidayResponse dto : publicHolidays) {
+
+            String key = dto.date() + "|" + dto.localName();
+
+            if (!existingMap.containsKey(key)) {
+                toInsert.add(
+                    Holiday.create(
+                        country,
+                        dto.date(),
+                        dto.localName(),
+                        dto.name(),
+                        dto.fixed(),
+                        dto.global(),
+                        dto.launchYear(),
+                        dto.types()
+                    )
                 );
             }
-
-            List<Holiday> holidays = new ArrayList<>();
-
-            for (NagerHolidayResponse publicHoliday : publicHolidays) {
-
-                boolean exists = holidayRepository.existsByCountryAndDateAndLocalName(
-                    country,
-                    publicHoliday.date(),
-                    publicHoliday.localName()
-                );
-
-                if (exists) {
-                    continue;
-                }
-
-                Holiday holiday = Holiday.create(
-                    country,
-                    publicHoliday.date(),
-                    publicHoliday.localName(),
-                    publicHoliday.name(),
-                    publicHoliday.fixed(),
-                    publicHoliday.global(),
-                    publicHoliday.launchYear(),
-                    publicHoliday.types()
-                );
-
-                holidays.add(holiday);
-            }
-
-            if (!holidays.isEmpty()) {
-                holidayRepository.saveAll(holidays);
-                log.info("공휴일 적재 완료 - year={}, country={}, inserted={}", year, countryCode, holidays.size());
-            } else {
-                log.info("추가로 적재할 공휴일이 없습니다 - year={}, country={}", year, countryCode);
-            }
-
-        } finally {
-            long end = System.currentTimeMillis();
-            log.info("[HolidaySyncService.syncByYearAndCountry] year={}, countryCode={}, elapsedMs={}",
-                year, countryCode, (end - start));
         }
+
+        if (!toInsert.isEmpty()) {
+            holidayRepository.saveAll(toInsert);
+            log.info("공휴일 적재 완료(최적화) - year={}, country={}, inserted={}", year, countryCode, toInsert.size());
+        }
+
+        long end = System.currentTimeMillis();
+        log.info("[HolidaySyncService.syncByYearAndCountry] year={}, countryCode={}, elapsedMs={}",
+            year, countryCode, (end - start));
     }
 
     @Transactional
