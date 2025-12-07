@@ -10,12 +10,6 @@ import java.util.List;
 
 public interface HolidayRepository extends JpaRepository<Holiday, Long> ,HolidayRepositoryCustom {
 
-    // 동일한 공휴일이 이미 있는지 확인하기 위한 용도
-    boolean existsByCountryAndDateAndLocalName(
-        Country country,
-        LocalDate date,
-        String localName
-    );
 
     List<Holiday> findByCountryAndYear(Country country, int year);
 

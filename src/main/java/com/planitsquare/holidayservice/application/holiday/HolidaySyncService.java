@@ -13,10 +13,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.HttpClientErrorException;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -29,6 +31,75 @@ public class HolidaySyncService {
     private final CountryRepository countryRepository;
     private final HolidayRepository holidayRepository;
     private final CountrySyncService countrySyncService;
+    private final Executor holidayExecutor;
+
+
+
+    public void syncFiveYearsAllCountriesParallel() {
+
+        long start = System.currentTimeMillis();
+        log.info("[Parallel Sync] 국가 + 5년치 휴일 병렬 적재 시작");
+
+        countrySyncService.syncCountries();
+        List<Country> countries = countryRepository.findAllByUsedTrue();
+
+        if (countries.isEmpty()) {
+            log.warn("[Parallel Sync] 사용 가능한 국가가 없습니다. CountrySyncService 동작을 확인해주세요.");
+            return;
+        }
+
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+        AtomicInteger successCount = new AtomicInteger(0);
+        AtomicInteger failureCount = new AtomicInteger(0);
+        List<String> failedTasks = Collections.synchronizedList(new ArrayList<>());
+
+        int totalTasks = 0;
+
+        for (int year = 2020; year <= 2025; year++) {
+            final int syncYear = year;
+
+            for (Country country : countries) {
+                final String countryCode = country.getCode();
+                totalTasks++;
+
+                CompletableFuture<Void> future =
+                    CompletableFuture.runAsync(() -> {
+                        try {
+                            syncByYearAndCountry(syncYear, countryCode);
+                            successCount.incrementAndGet();
+                        } catch (Exception e) {
+                            failureCount.incrementAndGet();
+                            String failKey = syncYear + "-" + countryCode;
+                            failedTasks.add(failKey);
+                            log.error("[Parallel Sync] year={}, country={} 실패", syncYear, countryCode, e);
+                        }
+                    }, holidayExecutor);
+
+                futures.add(future);
+            }
+        }
+
+        // 모든 작업이 끝날 때까지 대기
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
+        long end = System.currentTimeMillis();
+        long elapsed = end - start;
+
+        int success = successCount.get();
+        int failure = failureCount.get();
+
+        if (failure == 0) {
+            log.info("[Parallel Sync] 병렬 초기 적재 완료 - totalTasks={}, success={}, failure={}, elapsedMs={}ms",
+                totalTasks, success, failure, elapsed);
+        } else {
+            log.warn(
+                "[Parallel Sync] 병렬 초기 적재 완료(일부 실패) - totalTasks={}, success={}, failure={}, elapsedMs={}ms, failedTasks={}",
+                totalTasks, success, failure, elapsed, failedTasks
+            );
+        }
+    }
+
 
 
     @Transactional
@@ -41,42 +112,44 @@ public class HolidaySyncService {
                 "존재하지 않는 국가 코드입니다. countryCode=" + countryCode
             ));
 
-        List<NagerHolidayResponse> publicHolidays = nagerApiClient.getPublicHolidays(year, countryCode);
+        List<NagerHolidayResponse> publicHolidays = fetchHolidaysWithRetry(year, countryCode);
 
         List<Holiday> existing = holidayRepository.findByCountryAndYear(country, year);
-        Map<String, Holiday> existingMap = existing.stream()
-            .collect(Collectors.toMap(
-                h -> h.getDate() + "|" + h.getLocalName(),
-                Function.identity()
-            ));
+        Set<String> seenKeys = existing.stream()
+            .map(h -> h.getDate() + "|" + h.getLocalName() + "|" + (h.getTypes() == null ? "" : h.getTypes()))
+            .collect(Collectors.toSet());
 
         List<Holiday> toInsert = new ArrayList<>();
 
         for (NagerHolidayResponse dto : publicHolidays) {
+            String typeKey = buildTypeKey(dto.types());
+            String key = dto.date() + "|" + dto.localName() + "|" + typeKey;
 
-            String key = dto.date() + "|" + dto.localName();
-
-            if (!existingMap.containsKey(key)) {
-                toInsert.add(
-                    Holiday.create(
-                        country,
-                        dto.date(),
-                        dto.localName(),
-                        dto.name(),
-                        dto.fixed(),
-                        dto.global(),
-                        dto.launchYear(),
-                        dto.types()
-                    )
-                );
+            if (seenKeys.contains(key)) {
+                continue;
             }
+            seenKeys.add(key);
+
+            Holiday holiday = Holiday.create(
+                country,
+                dto.date(),
+                dto.localName(),
+                dto.name(),
+                dto.fixed(),
+                dto.global(),
+                dto.launchYear(),
+                dto.types()      // 여기서 내부에서 String으로 변환
+            );
+
+            toInsert.add(holiday);
         }
 
-        if (!toInsert.isEmpty()) {
-            holidayRepository.saveAll(toInsert);
-            log.info("공휴일 적재 완료(최적화) - year={}, country={}, inserted={}", year, countryCode, toInsert.size());
-        }
 
+
+      if (!toInsert.isEmpty()) {
+        holidayRepository.saveAll(toInsert);
+        log.info("공휴일 적재 완료(최적화) - year={}, country={}, inserted={}", year, countryCode, toInsert.size());
+    }
         long end = System.currentTimeMillis();
         log.info("[HolidaySyncService.syncByYearAndCountry] year={}, countryCode={}, elapsedMs={}",
             year, countryCode, (end - start));
@@ -211,6 +284,57 @@ public class HolidaySyncService {
                 year, countryCode, (end - start)
             );
         }
+    }
+
+    private List<NagerHolidayResponse> fetchHolidaysWithRetry(int year, String countryCode) {
+        int maxAttempts = 3;
+        int attempt = 0;
+
+        while (true) {
+            attempt++;
+            try {
+                // 실제 Nager API 호출
+                return nagerApiClient.getPublicHolidays(year, countryCode);
+
+            } catch (HttpClientErrorException.NotFound e) {
+                log.warn("해당 국가/연도는 API 데이터 없음 (404) - year={}, country={}", year, countryCode);
+                return Collections.emptyList();
+
+            } catch (Exception e) {
+                if (attempt >= maxAttempts) {
+                    log.error("Nager API 호출 실패 (최대 재시도 초과) - year={}, countryCode={}, attempt={}",
+                        year, countryCode, attempt, e);
+                    throw new BusinessException(
+                        ErrorCode.NAGER_API_ERROR,
+                        String.format("Nager.Date API 호출 실패 (year=%d, country=%s, attempt=%d)",
+                            year, countryCode, attempt)
+                    );
+                }
+
+                log.warn("Nager API 호출 실패, 재시도 진행 - year={}, countryCode={}, attempt={}",
+                    year, countryCode, attempt, e);
+
+                try {
+                    Thread.sleep(500L * attempt); // 간단 backoff (0.5s, 1s, 1.5s)
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new BusinessException(
+                        ErrorCode.NAGER_API_ERROR,
+                        "Nager.Date API 재시도 중 인터럽트 발생"
+                    );
+                }
+            }
+        }
+    }
+
+    private String buildTypeKey(List<String> types) {
+        if (types == null || types.isEmpty()) {
+            return "";
+        }
+        // 정렬해서 문자열 만들기
+        return types.stream()
+            .sorted()
+            .collect(Collectors.joining(","));
     }
 
 }

@@ -11,6 +11,14 @@ import java.util.List;
 @Entity
 @Getter
 @NoArgsConstructor
+@Table(
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_holiday_country_date_localname",
+            columnNames = {"country_id", "date", "local_name","types"}
+        )
+    }
+)
 public class Holiday {
 
     @Id

@@ -21,7 +21,8 @@ public class DataInitializer implements ApplicationRunner {
         log.info("[HolidayDataInitializer] 애플리케이션 시작 - 국가 + 5년치 휴일 초기 적재 시작");
         long start = System.currentTimeMillis();
 
-        holidaySyncService.syncFiveYearsAllCountries();
+        //holidaySyncService.syncFiveYearsAllCountries();
+        holidaySyncService.syncFiveYearsAllCountriesParallel();
 
         long end = System.currentTimeMillis();
         log.info("[HolidayDataInitializer] 초기 적재 완료 elapsedMs={}ms", (end - start));
