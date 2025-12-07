@@ -7,6 +7,8 @@ import com.planitsquare.holidayservice.domain.holiday.Holiday;
 import com.planitsquare.holidayservice.domain.holiday.HolidayRepository;
 import com.planitsquare.holidayservice.external.nager.NagerApiClient;
 import com.planitsquare.holidayservice.external.nager.dto.NagerHolidayResponse;
+import com.planitsquare.holidayservice.global.exception.BusinessException;
+import com.planitsquare.holidayservice.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,9 +31,22 @@ public class HolidaySyncService {
     @Transactional
     public void syncByYearAndCountry(int year, String countryCode) {
         Country country = countryRepository.findByCode(countryCode)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 국가 코드 입니다." + countryCode));
+            .orElseThrow(() -> new BusinessException(
+                ErrorCode.COUNTRY_NOT_FOUND,
+                "존재하지 않는 국가 코드입니다. countryCode=" + countryCode
+            ));
 
-        List<NagerHolidayResponse> publicHolidays = nagerApiClient.getPublicHolidays(year, countryCode);
+        List<NagerHolidayResponse> publicHolidays;
+        try {
+            publicHolidays = nagerApiClient.getPublicHolidays(year, countryCode);
+        } catch (Exception e) {
+            log.error("Nager.Date API 호출 중 오류 - year={}, countryCode={}", year, countryCode, e);
+            throw new BusinessException(
+                ErrorCode.NAGER_API_ERROR,
+                String.format("Nager.Date API 호출 실패 - year=%d, countryCode=%s, cause=%s",
+                    year, countryCode, e.getMessage())
+            );
+        }
 
         List<Holiday> holidays = new ArrayList<>();
 
@@ -85,8 +100,12 @@ public class HolidaySyncService {
 
                 try {
                     syncByYearAndCountry(year, code);
+                } catch (BusinessException e) {
+                    // 비즈니스 예외는 로그만 남기고 다음 루프로 진행
+                    log.error("공휴일 적재 중 비즈니스 오류 - year={}, country={}, code={}, message={}",
+                        year, code, e.getErrorCode().name(), e.getMessage());
                 } catch (Exception e) {
-                    log.error("공휴일 적재 중 오류 발생 - year={}, country={}", year, code, e);
+                    log.error("공휴일 적재 중 예상치 못한 오류 - year={}, country={}", year, code, e);
                 }
 
             }
@@ -97,15 +116,22 @@ public class HolidaySyncService {
 
     @Transactional
     public long delete(Integer year, String code) {
-        if (year == null && code == null) {
-            throw new IllegalStateException("삭제 조건 필요합니다");
+        // 삭제 조건 검증
+        if (year == null && (code == null || code.isBlank())) {
+            throw new BusinessException(
+                ErrorCode.DELETE_CONDITION_REQUIRED,
+                "삭제를 위해 year 또는 countryCode 중 하나 이상이 필요합니다."
+            );
         }
 
         Country country = null;
 
-        if (code != null) {
+        if (code != null && !code.isBlank()) {
             country = countryRepository.findByCode(code)
-                .orElseThrow(() -> new IllegalStateException("국가를 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(
+                    ErrorCode.COUNTRY_NOT_FOUND,
+                    "국가를 찾을 수 없습니다. countryCode=" + code
+                ));
         }
 
         if (year != null && country != null) {
@@ -124,16 +150,23 @@ public class HolidaySyncService {
     @Transactional
     public void refresh(Integer year, String countryCode) {
 
-        if (year == null && countryCode == null) {
-            throw new IllegalStateException("year 또는 countryCode 필요");
+        if (year == null && (countryCode == null || countryCode.isBlank())) {
+            throw new BusinessException(
+                ErrorCode.INVALID_REQUEST,
+                "재동기화를 위해 year 또는 countryCode 중 하나 이상이 필요합니다."
+            );
         }
 
         // 국가 조회 (필요한 경우에만)
         Country country = null;
-        if (countryCode != null) {
+        if (countryCode != null && !countryCode.isBlank()) {
             country = countryRepository.findByCode(countryCode)
-                .orElseThrow(() -> new IllegalStateException("국가를 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(
+                    ErrorCode.COUNTRY_NOT_FOUND,
+                    "국가를 찾을 수 없습니다. countryCode=" + countryCode
+                ));
         }
+
 
         // 1) 삭제
         if (year != null && country != null) {
