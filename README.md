@@ -46,7 +46,7 @@ PlanitSquare 기술 과제 요구사항을 충족하면서
 
 ### 3.1 Clone
 ```bash
-git clone <your-repo-url>
+git clone git@github.com:nimpa3201/holiday-service.git
 cd holiday-service
 ```
 
