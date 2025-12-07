@@ -18,11 +18,11 @@ public class DataInitializer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        log.info("[HolidayDataInitializer] 애플리케이션 시작 - 국가 + 5년치 휴일 초기 적재 시작");
+        log.info("[HolidayDataInitializer] 애플리케이션 시작 - 국가 + 6년치 휴일 초기 적재 시작");
         long start = System.currentTimeMillis();
 
         //holidaySyncService.syncFiveYearsAllCountries();
-        holidaySyncService.syncFiveYearsAllCountriesParallel();
+        holidaySyncService.syncSixYearsAllCountriesParallel();
 
         long end = System.currentTimeMillis();
         log.info("[HolidayDataInitializer] 초기 적재 완료 elapsedMs={}ms", (end - start));

@@ -41,7 +41,7 @@ public class HolidayQueryService {
             return PageResponse.from(map);
 
         } finally {
-            long end = System.currentTimeMillis(); // ✅ 시간 측정 종료
+            long end = System.currentTimeMillis();
             log.info(
                 "[HolidaySearch] cond={}, pageNumber={}, pageSize={}, elapsedMs={}",
                 cond,

@@ -39,7 +39,7 @@ public class HolidayController {
     )
 
     public ResponseEntity<ApiResponse<String>> initialSync() {
-        holidaySyncService.syncFiveYearsAllCountries();
+        holidaySyncService.syncSixYearsAllCountries();
         return ResponseEntity
             .status(HttpStatus.ACCEPTED)
             .body(ApiResponse.ok("initial sync completed"));

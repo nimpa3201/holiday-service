@@ -35,10 +35,10 @@ public class HolidaySyncService {
 
 
 
-    public void syncFiveYearsAllCountriesParallel() {
+    public void syncSixYearsAllCountriesParallel() {
 
         long start = System.currentTimeMillis();
-        log.info("[Parallel Sync] 국가 + 5년치 휴일 병렬 적재 시작");
+        log.info("[Parallel Sync] 국가 + 6년치 휴일 병렬 적재 시작");
 
         countrySyncService.syncCountries();
         List<Country> countries = countryRepository.findAllByUsedTrue();
@@ -156,7 +156,7 @@ public class HolidaySyncService {
     }
 
     @Transactional
-    public void syncFiveYearsAllCountries() {
+    public void syncSixYearsAllCountries() {
 
         long start = System.currentTimeMillis();
         try {
