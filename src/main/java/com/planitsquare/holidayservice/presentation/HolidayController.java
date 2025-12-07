@@ -31,19 +31,7 @@ public class HolidayController {
     private final HolidaySyncService holidaySyncService;
     private final HolidayQueryService holidayQueryService;
 
-    // 전체 국가/연도 초기 적재
-    @PostMapping("/sync/initial")
-    @Operation(
-        summary = "공휴일 초기 동기화 (5년 × 전체 국가)",
-        description = "2020~2025년 동안 used=true 인 모든 국가에 대해 공휴일을 Nager.Date API에서 조회하여 일괄 적재합니다."
-    )
 
-    public ResponseEntity<ApiResponse<String>> initialSync() {
-        holidaySyncService.syncSixYearsAllCountries();
-        return ResponseEntity
-            .status(HttpStatus.ACCEPTED)
-            .body(ApiResponse.ok("initial sync completed"));
-    }
 
     // 특정 연도/국가 적재
     @PostMapping("/sync/{year}/{countryCode}")
