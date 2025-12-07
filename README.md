@@ -39,20 +39,28 @@ PlanitSquare 기술 과제 요구사항을 충족하면서,
 ## 🚀 3. 빌드 & 실행 방법
 
 ### 3.1 Clone
+
+```text
 git clone <your-repo-url>  
-cd holiday-service  
+cd holiday-service
+```
 
 ### 3.2 Build
-./gradlew clean build  
+```text
+./gradlew clean build
+```
 
 ### 3.3 Run
-./gradlew bootRun  
+```text
+./gradlew bootRun
+```
 
 ### 3.4 주요 URL
+
 - Swagger UI: http://localhost:8080/swagger-ui/index.html  
 - H2 Console: http://localhost:8080/h2-console  
   - JDBC URL: jdbc:h2:mem:holidaydb  
-  - Username: sa  
+
 
 ---
 
@@ -170,31 +178,31 @@ GET /api/holidays
 ---
 
 ## 🧩 8. 패키지 구조 (실제 구현 기반)
-
+```text
 com.planitsquare.holidayservice
  ├─ global
  │   ├─ api
+ │   │   
  │   ├─ config
+ │   │   
  │   └─ exception
- │
+ │      
  ├─ domain
  │   ├─ country
+ │   │  
  │   └─ holiday
- │
+ │       
  ├─ external
  │   └─ nager
- │
+ │      
  ├─ application
  │   ├─ country
- │   └─ holiday
- │
+ │   └─ holiday       
  ├─ presentation
- │   ├─ HolidayController
- │   └─ dto
- │
- └─ scheduler
-
-
+ │   
+ └─ scheduler 
+    
+```
 ---
 
 ## 🗄 9. ERD
